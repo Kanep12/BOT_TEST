@@ -182,4 +182,145 @@ async def set_loc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE operators SET loc=$1 WHERE username=$2",
-            lo
+            loc, username
+        )
+
+    await update.message.reply_text("📍 Operating area updated")
+
+async def online(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    username = await get_operator(update.effective_user)
+    if not username:
+        return
+
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE operators SET online=true WHERE username=$1",
+            username
+        )
+
+    await update.message.reply_text("🟢 Status: ONLINE")
+
+async def offline(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    username = await get_operator(update.effective_user)
+    if not username:
+        return
+
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE operators SET online=false WHERE username=$1",
+            username
+        )
+
+    await update.message.reply_text("🔴 Status: OFFLINE")
+
+async def delivery(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    username = await get_operator(update.effective_user)
+    if not username or not context.args:
+        return
+
+    value = context.args[0].lower() in ("yes", "on", "true")
+
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE operators SET delivery=$1 WHERE username=$2",
+            value, username
+        )
+
+    await update.message.reply_text("🚚 Delivery status updated")
+
+# =====================
+# LINKS
+# =====================
+async def add_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID or len(context.args) < 2:
+        return
+
+    url = context.args[-1]
+    name = " ".join(context.args[:-1])
+
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO links (name, url) VALUES ($1, $2)",
+            name, url
+        )
+
+    await update.message.reply_text("✅ Link added")
+
+# =====================
+# BUTTONS
+# =====================
+async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    async with pool.acquire() as conn:
+
+        if q.data == "stock":
+            row = await conn.fetchrow("SELECT text FROM stock WHERE id=1")
+            await q.edit_message_caption(
+                caption=row["text"],
+                reply_markup=back(),
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+        elif q.data == "operators":
+            rows = await conn.fetch("SELECT * FROM operators")
+
+            if not rows:
+                text = "👤 **Operators**\n\nNo operators available."
+            else:
+                blocks = ["👤 **Operators**\n"]
+                for r in rows:
+                    blocks.append(format_operator_card(r))
+                    blocks.append("\n────────────\n")
+                text = "\n".join(blocks).rstrip("\n────────────\n")
+
+            await q.edit_message_caption(
+                caption=text,
+                reply_markup=back(),
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+        elif q.data == "links":
+            rows = await conn.fetch("SELECT * FROM links")
+            text = format_links(rows)
+
+            await q.edit_message_caption(
+                caption=text,
+                reply_markup=back(),
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+        elif q.data == "back":
+            await q.edit_message_caption(
+                caption=HOME_CAPTION,
+                reply_markup=main_menu(),
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+# =====================
+# MAIN
+# =====================
+def main():
+    app = (
+        ApplicationBuilder()
+        .token(TOKEN)
+        .post_init(init_db)
+        .build()
+    )
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("stock", set_stock))
+    app.add_handler(CommandHandler("addoperator", add_operator))
+    app.add_handler(CommandHandler("loc", set_loc))
+    app.add_handler(CommandHandler("online", online))
+    app.add_handler(CommandHandler("offline", offline))
+    app.add_handler(CommandHandler("delivery", delivery))
+    app.add_handler(CommandHandler("link", add_link))
+    app.add_handler(CallbackQueryHandler(buttons))
+
+    print("✅ Bot is running")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
