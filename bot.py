@@ -1,7 +1,16 @@
 import os
 import asyncpg
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup
+)
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes
+)
 from telegram.constants import ParseMode
 
 TOKEN = os.environ["BOT_TOKEN"]
@@ -24,7 +33,7 @@ async def init_db(app):
             text TEXT
         );
         INSERT INTO stock (id, text)
-        VALUES (1, 'No stock available.')
+        VALUES (1, '📦 Stock\n\nInfo puudub.')
         ON CONFLICT (id) DO NOTHING;
         """)
 
@@ -47,7 +56,7 @@ async def init_db(app):
         """)
 
 # =====================
-# UI TEXTS
+# UI
 # =====================
 HOME_CAPTION = (
     "🐶 **Welcome to DoggieMarket**\n\n"
@@ -57,45 +66,18 @@ HOME_CAPTION = (
 )
 
 def main_menu():
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("📦 Stock", callback_data="stock"),
-        InlineKeyboardButton("👤 Operators", callback_data="operators"),
-        InlineKeyboardButton("🔗 Links", callback_data="links")
-    ]])
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📦 Stock", callback_data="stock"),
+            InlineKeyboardButton("👤 Operators", callback_data="operators"),
+            InlineKeyboardButton("🔗 Links", callback_data="links")
+        ]
+    ])
 
 def back():
-    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]])
-
-# =====================
-# FORMATTERS
-# =====================
-def format_stock(text: str) -> str:
-    """Force clean, readable stock layout"""
-    return f"📦 **Stock**\n\n{text.strip()}"
-
-def format_operator_card(r) -> str:
-    area = r["loc"].strip() if r["loc"] else "Not specified"
-    status = "🟢 Online" if r["online"] else "🔴 Offline"
-    delivery = "Available" if r["delivery"] else "Not available"
-
-    return (
-        "**Operator Contact**\n"
-        f"👤 **{r['username']}**\n\n"
-        f"📍 **Operating Area:** {area}\n"
-        f"📡 **Status:** {status}\n"
-        f"🚚 **Delivery:** {delivery}"
-    )
-
-def format_links(rows) -> str:
-    if not rows:
-        return "🔗 **Useful Links**\n\nNo links available."
-
-    out = ["🔗 **Useful Links**\n"]
-    for r in rows:
-        out.append(f"🔹 **{r['name']}**")
-        out.append(f"🔗 {r['url']}")
-        out.append("────────────")
-    return "\n".join(out).rstrip("────────────")
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 Back", callback_data="back")]
+    ])
 
 # =====================
 # /start
@@ -110,25 +92,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =====================
-# STOCK (FIXITUD)
+# STOCK (ORIGINAAL LOOGIKA)
 # =====================
 async def set_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID or not context.args:
+    if update.effective_user.id != OWNER_ID:
+        return
+    if not context.args:
         return
 
-    # ⚠️ oluline: säilitab reavahed
+    # ⬅️ TÄHTIS: ei töötle, ei formaadi
     text = " ".join(context.args)
 
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE stock SET text=$1 WHERE id=1", text)
+        await conn.execute(
+            "UPDATE stock SET text=$1 WHERE id=1",
+            text
+        )
 
-    await update.message.reply_text("✅ Stock updated")
+    await update.message.reply_text("✅ Stock salvestatud")
 
 # =====================
 # OPERATORS
 # =====================
 async def add_operator(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID or not context.args:
+    if update.effective_user.id != OWNER_ID:
+        return
+    if not context.args:
         return
 
     raw = context.args[0]
@@ -141,15 +130,19 @@ async def add_operator(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ON CONFLICT (username) DO NOTHING
         """, username)
 
-    await update.message.reply_text(f"✅ Operator added: {username}")
+    await update.message.reply_text(f"✅ Operator lisatud: {username}")
 
 async def get_operator(user):
     if not user.username:
         return None
+
     username = f"@{user.username}"
 
     async with pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT username FROM operators WHERE username=$1", username)
+        row = await conn.fetchrow(
+            "SELECT username FROM operators WHERE username=$1",
+            username
+        )
         if row:
             await conn.execute(
                 "UPDATE operators SET user_id=$1 WHERE username=$2",
@@ -162,85 +155,129 @@ async def set_loc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
     if not username or not context.args:
         return
+
     loc = " ".join(context.args)
 
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE operators SET loc=$1 WHERE username=$2", loc, username)
+        await conn.execute(
+            "UPDATE operators SET loc=$1 WHERE username=$2",
+            loc, username
+        )
 
-    await update.message.reply_text("📍 Location updated")
+    await update.message.reply_text("📍 Location salvestatud")
 
 async def online(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
     if not username:
         return
+
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE operators SET online=true WHERE username=$1", username)
-    await update.message.reply_text("🟢 Status: ONLINE")
+        await conn.execute(
+            "UPDATE operators SET online=true WHERE username=$1",
+            username
+        )
+
+    await update.message.reply_text("🟢 ONLINE")
 
 async def offline(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
     if not username:
         return
+
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE operators SET online=false WHERE username=$1", username)
-    await update.message.reply_text("🔴 Status: OFFLINE")
+        await conn.execute(
+            "UPDATE operators SET online=false WHERE username=$1",
+            username
+        )
+
+    await update.message.reply_text("🔴 OFFLINE")
 
 async def delivery(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
     if not username or not context.args:
         return
+
     value = context.args[0].lower() in ("yes", "on", "true")
+
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE operators SET delivery=$1 WHERE username=$2", value, username)
-    await update.message.reply_text("🚚 Delivery updated")
+        await conn.execute(
+            "UPDATE operators SET delivery=$1 WHERE username=$2",
+            value, username
+        )
+
+    await update.message.reply_text("🚚 Delivery salvestatud")
 
 # =====================
 # LINKS
 # =====================
 async def add_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID or len(context.args) < 2:
+    if update.effective_user.id != OWNER_ID:
         return
+    if len(context.args) < 2:
+        return
+
     url = context.args[-1]
     name = " ".join(context.args[:-1])
 
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO links (name, url) VALUES ($1, $2)", name, url)
+        await conn.execute(
+            "INSERT INTO links (name, url) VALUES ($1, $2)",
+            name, url
+        )
 
-    await update.message.reply_text("✅ Link added")
+    await update.message.reply_text("✅ Link lisatud")
 
 # =====================
-# BUTTONS
+# BUTTONS (ORIGINAAL STOCK)
 # =====================
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
 
     async with pool.acquire() as conn:
+
         if q.data == "stock":
             row = await conn.fetchrow("SELECT text FROM stock WHERE id=1")
             await q.edit_message_caption(
-                caption=format_stock(row["text"]),
+                caption=row["text"],
                 reply_markup=back(),
                 parse_mode=ParseMode.MARKDOWN
             )
 
         elif q.data == "operators":
             rows = await conn.fetch("SELECT * FROM operators")
-            if not rows:
-                text = "👤 **Operators**\n\nNo operators available."
-            else:
-                blocks = ["👤 **Operators**\n"]
-                for r in rows:
-                    blocks.append(format_operator_card(r))
-                    blocks.append("\n────────────\n")
-                text = "\n".join(blocks).rstrip("\n────────────\n")
 
-            await q.edit_message_caption(text, reply_markup=back(), parse_mode=ParseMode.MARKDOWN)
+            if not rows:
+                text = "👤 Operators\n\nInfo puudub."
+            else:
+                out = ["👤 Operators\n"]
+                for r in rows:
+                    out.append(
+                        f"{r['username']} | 📍 {r['loc'] or 'Not specified'} | "
+                        f"{'🟢 Online' if r['online'] else '🔴 Offline'} | "
+                        f"🚚 {'Available' if r['delivery'] else 'Not available'}"
+                    )
+                text = "\n".join(out)
+
+            await q.edit_message_caption(
+                caption=text,
+                reply_markup=back(),
+                parse_mode=ParseMode.MARKDOWN
+            )
 
         elif q.data == "links":
             rows = await conn.fetch("SELECT * FROM links")
+
+            if not rows:
+                text = "🔗 Links\n\nInfo puudub."
+            else:
+                out = ["🔗 Useful Links\n"]
+                for r in rows:
+                    out.append(f"📢 {r['name']}\n🔗 {r['url']}\n")
+                text = "\n".join(out)
+
             await q.edit_message_caption(
-                caption=format_links(rows),
+                caption=text,
                 reply_markup=back(),
                 parse_mode=ParseMode.MARKDOWN
             )
@@ -273,7 +310,7 @@ def main():
     app.add_handler(CommandHandler("link", add_link))
     app.add_handler(CallbackQueryHandler(buttons))
 
-    print("✅ Bot is running")
+    print("Bot töötab")
     app.run_polling()
 
 if __name__ == "__main__":
