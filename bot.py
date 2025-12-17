@@ -92,16 +92,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =====================
-# STOCK (ORIGINAAL LOOGIKA)
+# STOCK (AINUS ÕIGE LAHENDUS)
 # =====================
 async def set_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return
-    if not context.args:
+
+    # ⬇️ peab olema reply
+    if not update.message.reply_to_message or not update.message.reply_to_message.text:
+        await update.message.reply_text(
+            "❗ Kasuta /stock vastusena stocki tekstile.\n\n"
+            "Näide:\n"
+            "1️⃣ kirjuta stock tekst\n"
+            "2️⃣ reply sellele sõnumile\n"
+            "3️⃣ kirjuta /stock"
+        )
         return
 
-    # ⬅️ TÄHTIS: ei töötle, ei formaadi
-    text = " ".join(context.args)
+    text = update.message.reply_to_message.text
 
     async with pool.acquire() as conn:
         await conn.execute(
@@ -109,15 +117,13 @@ async def set_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text
         )
 
-    await update.message.reply_text("✅ Stock salvestatud")
+    await update.message.reply_text("✅ Stock salvestatud (reavahed säilisid)")
 
 # =====================
 # OPERATORS
 # =====================
 async def add_operator(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return
-    if not context.args:
+    if update.effective_user.id != OWNER_ID or not context.args:
         return
 
     raw = context.args[0]
@@ -211,9 +217,7 @@ async def delivery(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # LINKS
 # =====================
 async def add_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return
-    if len(context.args) < 2:
+    if update.effective_user.id != OWNER_ID or len(context.args) < 2:
         return
 
     url = context.args[-1]
@@ -228,7 +232,7 @@ async def add_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Link lisatud")
 
 # =====================
-# BUTTONS (ORIGINAAL STOCK)
+# BUTTONS
 # =====================
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
