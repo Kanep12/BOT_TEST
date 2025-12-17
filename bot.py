@@ -33,7 +33,7 @@ async def init_db(app):
             text TEXT
         );
         INSERT INTO stock (id, text)
-        VALUES (1, '📦 Stock\n\nInfo unavailable.')
+        VALUES (1, '📦 Stock\n\nNo stock information available.')
         ON CONFLICT (id) DO NOTHING;
         """)
 
@@ -76,7 +76,7 @@ def back():
     ])
 
 # =====================
-# FORMATTER (UUS)
+# OPERATOR FORMATTER
 # =====================
 def format_operator_card(r) -> str:
     username = r["username"]
@@ -84,13 +84,13 @@ def format_operator_card(r) -> str:
     online = r["online"]
     delivery = r["delivery"]
 
-    operating_area = loc.strip() if loc and loc.strip() and loc != "Not set" else "Not specified"
+    operating_area = loc.strip() if loc and loc.strip() else "Not specified"
     status_icon = "🟢" if online else "🔴"
     status_text = "Online" if online else "Offline"
     delivery_text = "Available" if delivery else "Not available"
 
     return (
-        f"**Operator Contact**\n"
+        "**Operator Contact**\n"
         f"👤 **{username}**\n\n"
         f"📍 **Operating Area:** {operating_area}\n"
         f"📡 **Current Status:** {status_icon} {status_text}\n"
@@ -116,8 +116,10 @@ async def set_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return
     if not context.args:
+        await update.message.reply_text("Usage: /stock <text>")
         return
 
+    # OLULINE FIX: säilitab reavahetused
     text = " ".join(context.args)
 
     async with pool.acquire() as conn:
@@ -132,9 +134,7 @@ async def set_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # OPERATORS
 # =====================
 async def add_operator(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return
-    if not context.args:
+    if update.effective_user.id != OWNER_ID or not context.args:
         return
 
     raw = context.args[0]
@@ -194,7 +194,7 @@ async def online(update: Update, context: ContextTypes.DEFAULT_TYPE):
             username
         )
 
-    await update.message.reply_text("🟢 Status set to ONLINE")
+    await update.message.reply_text("🟢 Status: ONLINE")
 
 async def offline(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
@@ -207,7 +207,7 @@ async def offline(update: Update, context: ContextTypes.DEFAULT_TYPE):
             username
         )
 
-    await update.message.reply_text("🔴 Status set to OFFLINE")
+    await update.message.reply_text("🔴 Status: OFFLINE")
 
 async def delivery(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
@@ -265,11 +265,11 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not rows:
                 text = "👤 **Operators**\n\nNo operators available."
             else:
-                cards = ["👤 **Operators**\n"]
+                blocks = ["👤 **Operators**\n"]
                 for r in rows:
-                    cards.append(format_operator_card(r))
-                    cards.append("\n—\n")
-                text = "\n".join(cards).rstrip("\n—\n")
+                    blocks.append(format_operator_card(r))
+                    blocks.append("\n—\n")
+                text = "\n".join(blocks).rstrip("\n—\n")
 
             await q.edit_message_caption(
                 caption=text,
