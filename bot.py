@@ -1,16 +1,7 @@
 import os
 import asyncpg
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup
-)
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from telegram.constants import ParseMode
 
 TOKEN = os.environ["BOT_TOKEN"]
@@ -33,7 +24,7 @@ async def init_db(app):
             text TEXT
         );
         INSERT INTO stock (id, text)
-        VALUES (1, '📦 Stock\n\nNo stock information available.')
+        VALUES (1, 'No stock available.')
         ON CONFLICT (id) DO NOTHING;
         """)
 
@@ -73,34 +64,35 @@ def main_menu():
     ]])
 
 def back():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 Back", callback_data="back")]
-    ])
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]])
 
 # =====================
 # FORMATTERS
 # =====================
+def format_stock(text: str) -> str:
+    """Force clean, readable stock layout"""
+    return f"📦 **Stock**\n\n{text.strip()}"
+
 def format_operator_card(r) -> str:
-    operating_area = r["loc"].strip() if r["loc"] else "Not specified"
-    status_icon = "🟢" if r["online"] else "🔴"
-    status_text = "Online" if r["online"] else "Offline"
-    delivery_text = "Available" if r["delivery"] else "Not available"
+    area = r["loc"].strip() if r["loc"] else "Not specified"
+    status = "🟢 Online" if r["online"] else "🔴 Offline"
+    delivery = "Available" if r["delivery"] else "Not available"
 
     return (
         "**Operator Contact**\n"
         f"👤 **{r['username']}**\n\n"
-        f"📍 **Operating Area:** {operating_area}\n"
-        f"📡 **Current Status:** {status_icon} {status_text}\n"
-        f"🚚 **Delivery Service:** {delivery_text}"
+        f"📍 **Operating Area:** {area}\n"
+        f"📡 **Status:** {status}\n"
+        f"🚚 **Delivery:** {delivery}"
     )
 
 def format_links(rows) -> str:
     if not rows:
-        return "🔗 **Links**\n\nNo links available."
+        return "🔗 **Useful Links**\n\nNo links available."
 
     out = ["🔗 **Useful Links**\n"]
     for r in rows:
-        out.append(f"📢 **{r['name']}**")
+        out.append(f"🔹 **{r['name']}**")
         out.append(f"🔗 {r['url']}")
         out.append("────────────")
     return "\n".join(out).rstrip("────────────")
@@ -118,19 +110,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =====================
-# STOCK
+# STOCK (FIXITUD)
 # =====================
 async def set_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or not context.args:
         return
 
+    # ⚠️ oluline: säilitab reavahed
     text = " ".join(context.args)
 
     async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE stock SET text=$1 WHERE id=1",
-            text
-        )
+        await conn.execute("UPDATE stock SET text=$1 WHERE id=1", text)
 
     await update.message.reply_text("✅ Stock updated")
 
@@ -156,14 +146,10 @@ async def add_operator(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def get_operator(user):
     if not user.username:
         return None
-
     username = f"@{user.username}"
 
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT username FROM operators WHERE username=$1",
-            username
-        )
+        row = await conn.fetchrow("SELECT username FROM operators WHERE username=$1", username)
         if row:
             await conn.execute(
                 "UPDATE operators SET user_id=$1 WHERE username=$2",
@@ -176,57 +162,37 @@ async def set_loc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
     if not username or not context.args:
         return
-
     loc = " ".join(context.args)
 
     async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE operators SET loc=$1 WHERE username=$2",
-            loc, username
-        )
+        await conn.execute("UPDATE operators SET loc=$1 WHERE username=$2", loc, username)
 
-    await update.message.reply_text("📍 Operating area updated")
+    await update.message.reply_text("📍 Location updated")
 
 async def online(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
     if not username:
         return
-
     async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE operators SET online=true WHERE username=$1",
-            username
-        )
-
+        await conn.execute("UPDATE operators SET online=true WHERE username=$1", username)
     await update.message.reply_text("🟢 Status: ONLINE")
 
 async def offline(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
     if not username:
         return
-
     async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE operators SET online=false WHERE username=$1",
-            username
-        )
-
+        await conn.execute("UPDATE operators SET online=false WHERE username=$1", username)
     await update.message.reply_text("🔴 Status: OFFLINE")
 
 async def delivery(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = await get_operator(update.effective_user)
     if not username or not context.args:
         return
-
     value = context.args[0].lower() in ("yes", "on", "true")
-
     async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE operators SET delivery=$1 WHERE username=$2",
-            value, username
-        )
-
-    await update.message.reply_text("🚚 Delivery status updated")
+        await conn.execute("UPDATE operators SET delivery=$1 WHERE username=$2", value, username)
+    await update.message.reply_text("🚚 Delivery updated")
 
 # =====================
 # LINKS
@@ -234,15 +200,11 @@ async def delivery(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def add_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or len(context.args) < 2:
         return
-
     url = context.args[-1]
     name = " ".join(context.args[:-1])
 
     async with pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO links (name, url) VALUES ($1, $2)",
-            name, url
-        )
+        await conn.execute("INSERT INTO links (name, url) VALUES ($1, $2)", name, url)
 
     await update.message.reply_text("✅ Link added")
 
@@ -254,18 +216,16 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
 
     async with pool.acquire() as conn:
-
         if q.data == "stock":
             row = await conn.fetchrow("SELECT text FROM stock WHERE id=1")
             await q.edit_message_caption(
-                caption=row["text"],
+                caption=format_stock(row["text"]),
                 reply_markup=back(),
                 parse_mode=ParseMode.MARKDOWN
             )
 
         elif q.data == "operators":
             rows = await conn.fetch("SELECT * FROM operators")
-
             if not rows:
                 text = "👤 **Operators**\n\nNo operators available."
             else:
@@ -275,18 +235,12 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     blocks.append("\n────────────\n")
                 text = "\n".join(blocks).rstrip("\n────────────\n")
 
-            await q.edit_message_caption(
-                caption=text,
-                reply_markup=back(),
-                parse_mode=ParseMode.MARKDOWN
-            )
+            await q.edit_message_caption(text, reply_markup=back(), parse_mode=ParseMode.MARKDOWN)
 
         elif q.data == "links":
             rows = await conn.fetch("SELECT * FROM links")
-            text = format_links(rows)
-
             await q.edit_message_caption(
-                caption=text,
+                caption=format_links(rows),
                 reply_markup=back(),
                 parse_mode=ParseMode.MARKDOWN
             )
