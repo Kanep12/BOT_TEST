@@ -70,7 +70,7 @@ def main_menu():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📦 Stock", callback_data="stock"),
-            InlineKeyboardButton("👤 Operators", callback_data="operators"),
+            InlineKeyboardButton("👳🏾‍♂️ Operators", callback_data="operators"),
             InlineKeyboardButton("🔗 Links", callback_data="links")
         ]
     ])
@@ -91,7 +91,7 @@ def format_operator_card(r) -> str:
 
     return (
         "**Operator Contact**\n"
-        f"👤 **{r['username']}**\n\n"
+        f"👳🏾‍♂️ **{r['username']}**\n\n"
         f"📍 **Operating Area:** {area}\n"
         f"📡 **Current Status:** {status_icon} {status_text}\n"
         f"🚚 **Delivery Service:** {delivery_text}"
@@ -282,9 +282,9 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             rows = await conn.fetch("SELECT * FROM operators")
 
             if not rows:
-                text = "👤 **Operators**\n\nNo operators available."
+                text = "👳🏾‍♂️ **Operators**\n\nNo operators available."
             else:
-                blocks = ["👤 **Operators**\n"]
+                blocks = ["👳🏾‍♂️ **Operators**\n"]
                 for r in rows:
                     blocks.append(format_operator_card(r))
                     blocks.append("\n────────────\n")
