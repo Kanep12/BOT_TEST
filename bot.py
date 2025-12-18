@@ -101,7 +101,7 @@ def format_links(rows) -> str:
     if not rows:
         return "🔗 **Useful Links**\n\nNo links available."
 
-    out = ["🔗 **Useful Links**\n"]
+    out = ["💚 **Useful Links**\n"]
     for r in rows:
         out.append(f"📢 **{r['name']}**")
         out.append(f"🔗 {r['url']}")
