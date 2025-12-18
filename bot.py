@@ -3,7 +3,8 @@ import asyncpg
 from telegram import (
     Update,
     InlineKeyboardButton,
-    InlineKeyboardMarkup
+    InlineKeyboardMarkup,
+    InputMediaPhoto
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -80,7 +81,7 @@ def back():
     ])
 
 # =====================
-# FORMATTERS (UUS)
+# FORMATTERS
 # =====================
 def format_operator_card(r) -> str:
     area = r["loc"].strip() if r["loc"] else "Not specified"
@@ -111,7 +112,7 @@ def format_links(rows) -> str:
 # /start
 # =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with open("doggie.png", "rb") as photo:
+    with open("home.png", "rb") as photo:
         await update.message.reply_photo(
             photo=photo,
             caption=HOME_CAPTION,
@@ -120,7 +121,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =====================
-# STOCK (REPLY-BASED, ÄRA PUUTU)
+# STOCK (REPLY-BASED)
 # =====================
 async def set_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
@@ -268,11 +269,14 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if q.data == "stock":
             row = await conn.fetchrow("SELECT text FROM stock WHERE id=1")
-            await q.edit_message_caption(
+
+            media = InputMediaPhoto(
+                media=open("stock.png", "rb"),
                 caption=row["text"],
-                reply_markup=back(),
                 parse_mode=ParseMode.MARKDOWN
             )
+
+            await q.edit_message_media(media=media, reply_markup=back())
 
         elif q.data == "operators":
             rows = await conn.fetch("SELECT * FROM operators")
@@ -286,26 +290,33 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     blocks.append("\n────────────\n")
                 text = "\n".join(blocks).rstrip("\n────────────\n")
 
-            await q.edit_message_caption(
+            media = InputMediaPhoto(
+                media=open("operators.png", "rb"),
                 caption=text,
-                reply_markup=back(),
                 parse_mode=ParseMode.MARKDOWN
             )
+
+            await q.edit_message_media(media=media, reply_markup=back())
 
         elif q.data == "links":
             rows = await conn.fetch("SELECT * FROM links")
-            await q.edit_message_caption(
+
+            media = InputMediaPhoto(
+                media=open("link.png", "rb"),
                 caption=format_links(rows),
-                reply_markup=back(),
                 parse_mode=ParseMode.MARKDOWN
             )
 
+            await q.edit_message_media(media=media, reply_markup=back())
+
         elif q.data == "back":
-            await q.edit_message_caption(
+            media = InputMediaPhoto(
+                media=open("home.png", "rb"),
                 caption=HOME_CAPTION,
-                reply_markup=main_menu(),
                 parse_mode=ParseMode.MARKDOWN
             )
+
+            await q.edit_message_media(media=media, reply_markup=main_menu())
 
 # =====================
 # MAIN
