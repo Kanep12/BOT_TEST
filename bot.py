@@ -60,7 +60,7 @@ async def init_db(app):
 # UI
 # =====================
 HOME_CAPTION = (
-    "🐶 **Welcome to DoggieMarket**\n\n"
+    "👳🏾‍♂️ **Welcome to IndiaMarket**\n\n"
     "Your trusted marketplace.\n"
     "Fast • Discreet • Reliable\n\n"
     "Please choose an option below."
