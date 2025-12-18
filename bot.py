@@ -94,7 +94,7 @@ def format_operator_card(r) -> str:
         f"👳🏾‍♂️ **{r['username']}**\n\n"
         f"📍 **Operating Area:** {area}\n"
         f"📡 **Current Status:** {status_icon} {status_text}\n"
-        f"🚚 **Delivery Service:** {delivery_text}"
+        f"🛵 **Delivery Service:** {delivery_text}"
     )
 
 def format_links(rows) -> str:
@@ -238,7 +238,7 @@ async def delivery(update: Update, context: ContextTypes.DEFAULT_TYPE):
             value, username
         )
 
-    await update.message.reply_text("🚚 Delivery updated")
+    await update.message.reply_text("🛵 Delivery updated")
 
 # =====================
 # LINKS
