@@ -282,9 +282,9 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             rows = await conn.fetch("SELECT * FROM operators")
 
             if not rows:
-                text = "👳🏾‍♂️ **Operators**\n\nNo operators available."
+                text = "💚 **Operators**\n\nNo operators available."
             else:
-                blocks = ["👳🏾‍♂️ **Operators**\n"]
+                blocks = ["💚 **Operators**\n"]
                 for r in rows:
                     blocks.append(format_operator_card(r))
                     blocks.append("\n────────────\n")
